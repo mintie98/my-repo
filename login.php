@@ -1,7 +1,92 @@
 <?php
 // セッション開始
+require_once dirname(__FILE__) . '/function/db_connection.php';
+
 session_start();
-// require_once dirname(__FILE__) . '/function/db_connection.php';
+
+$message1="";
+$message2="";
+if(!empty($_SESSION["error1"])){
+  $message1 = $_SESSION["error1"];
+}
+if(!empty($_SESSION["error2"])){
+  $message2 = $_SESSION["error2"];
+}
+require_once dirname(__FILE__) . '/function/function.php';
+$a = true;
+$admin = true;
+//postでデータ取得
+$user_id = filter_input( INPUT_GET, "user_id");
+$pass = filter_input( INPUT_GET, "password");
+// データベースに接続
+$connection = connection();
+      
+try{
+   if($user_id){
+        //IDによってsql のテーブルが変わる
+        if($user_id == 10000){
+          $table="admin";  
+            $id="admin_id";
+            $pw="admin_pass";
+        }elseif($user_id > 100){
+            $table="user";
+            $id="user_id";
+            $pw="user_pass";
+        }elseif($user_id < 100 ){
+          $table="employee";  
+          $id="emp_id";
+          $pw="emp_pass";
+        } else {
+            throw new Exception('IDが間違っています！');
+        }
+        //   $sql =  "SELECT {$id},{$pass} FROM {$table} " ;
+        //   $stmt = $db -> prepare($sql);
+        //   $stmt->execute();
+        //   $checkuser=[];
+        //  while($row = $stmt->fetch(PDO::FETCH_ASSOC)){
+        //     $checkuser[]=$row;
+        //  };
+        $sql =  "SELECT {$id},{$pw} FROM {$table}  WHERE {$id}=:user_id" ;
+        //SQLのプリペアードステートメントを実行
+        $stmt = $connection-> prepare($sql);
+       // $stmt->bindParam(":user_id",$id, PDO::PARAM_INT);   
+        $stmt->execute(['user_id' => $user_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+
+
+        //error処理
+        
+        // print_r($row[$pw]);
+        //   exit;
+        //user_idがnullの場合
+        if (empty($row)) {
+                $_SESSION["error1"]="IDが間違っています！";
+                throw new Exception('IDが間違っています！');
+        }else{
+             if($row[$id] == $user_id){
+                if($row[$pw]== $pass){
+                header("Location: board_home.php?user_id=$user_id"); 
+                exit;
+                }else{
+                    $_SESSION["error2"]="パスワードが一致されてません！";
+                    throw new Exception($_SESSION["error1"]="");
+                    header("Location: login.php?user_id=$user_id" . urlencode($user_id)); // Chuyển hướng trở lại trang cũ và kèm theo tham số error và username
+                    exit;
+                }
+            }
+        }
+            }else{
+            $_SESSION["error1"]="";
+            $_SESSION["error2"]="";
+           
+        }
+}catch (Exception $e) {
+    // Bắt lỗi và xử lý
+    $_SESSION["error1"]=$e->getMessage();
+    header("Location: login.php");
+    exit;
+}
 //ログイン認証
 if (isset($_SESSION['pass_save'])) {
   //ログイン維持状態の時ログインページへ飛ぼうとしている
@@ -92,11 +177,12 @@ function login($user_id, $password, $pass_save)
         <div class="tab-content mt-6">
           <!-- ログインフォーム -->
           <div class="block" id="user"><!--TODO 要素の横幅-->
-            <form action="" method="post">
+            <form action="login.php" method="get">
               <!-- ID -->
               <div class="relative mb-5 mx-auto md:w-3/4">
                 <input type="number" name="user_id" id="user_id" class="block p-4 w-full h-16 text-lg text-black rounded-lg border-2 bg-white focus:outline-none focus:ring-0 focus:border-blue-600 peer" placeholder=" " required />
                 <label for="user_id" class="absolute text-sm text-gray-500 duration-300 transform -translate-y-2 scale-75 top-2 z-10 origin-[0] px-2 peer-focus:px-2 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-2 left-1">ID</label>
+                <em style="color:red"> <?=$message1  ?></em>
               </div>
               <!-- パスワード -->
               <div class="relative mb-5 mx-auto md:w-3/4">
@@ -105,6 +191,7 @@ function login($user_id, $password, $pass_save)
                 <div class="absolute inset-y-0 right-1 flex my-2 items-center">
                   <i class="text-right fa fa-eye pr-3" id="password_eye"></i>
                 </div>
+                <em style="color:red"> <?= $message2 ?></em>
               </div>
               <div class="relative mb-5 mx-auto md:w-3/4">
                 <input type="checkbox" name="pass_save" id="pass_save" value="true">
